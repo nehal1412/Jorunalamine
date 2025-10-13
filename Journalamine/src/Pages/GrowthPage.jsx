@@ -1,23 +1,18 @@
 // src/pages/GrowthPage.jsx
-import { useMemo, useState, useEffect } from "react";
-//GrowthPage
+import { useMemo, useState } from "react";
+
 const styles = `
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&display=swap');
-
 :root{
   --beige: #f5e9d4;
   --beige-weak: #f1e2c9;
   --beige-soft: #e9d6b8;
   --ink-dark: #0b1020;
 }
-
-/* Optional video background */
 .bg-video{
   position: fixed; inset:0; z-index:-2; object-fit: cover; width:100%; height:100%;
   filter: saturate(110%) contrast(105%) brightness(80%);
 }
-
-/* Canvas */
 .growth-wrap{ min-height: 58vh; display:grid; place-items:center; margin: 24px 0 32px; }
 .growth-card{
   position: relative;
@@ -35,8 +30,6 @@ const styles = `
   animation: floatGlow 18s ease-in-out infinite alternate;
 }
 @keyframes floatGlow{ from{ transform: translateY(-2px) } to{ transform: translateY(2px) } }
-
-/* Header */
 .header{ text-align:center; margin-bottom: 10px; position: relative; z-index: 1; }
 .kicker{
   color: var(--beige-soft); letter-spacing: 1.6px; text-transform: uppercase;
@@ -49,8 +42,6 @@ const styles = `
   font-size: clamp(28px, 5vw, 56px); line-height: 1.05;
   text-shadow: 0 2px 18px rgba(245,233,212,0.16);
 }
-
-/* Scope buttons */
 .scope-wrap{ display:flex; justify-content:center; }
 .scope-row{
   display:flex; gap:10px; justify-content:center; flex-wrap: wrap; margin: 14px 0 18px;
@@ -69,19 +60,13 @@ const styles = `
 }
 .scope-btn:hover{ transform: translateY(-1px); filter: brightness(0.98); }
 .scope-btn.active{ box-shadow: 0 16px 36px rgba(245,233,212,0.34); }
-
-/* Sections */
 .section-title{
   color: var(--beige); font-weight: 800; letter-spacing: .2px;
   font-size: 14px; margin: 14px 6px 8px;
   text-transform: uppercase;
 }
-
-/* Transition mounts */
 .mount-enter{ animation: slideIn .28s ease both; }
 @keyframes slideIn { from{ opacity:0; transform: translateY(10px) scale(.98);} to{ opacity:1; transform:none;} }
-
-/* Lists / rows */
 .list{ display:grid; gap: 12px; margin: 10px 0 16px; }
 .row{
   display:grid; grid-template-columns: 260px 1fr 1.2fr auto; gap: 12px; align-items: start;
@@ -96,8 +81,6 @@ const styles = `
   .row{ grid-template-columns: 1fr; }
   .cell-actions{ justify-content: flex-end; }
 }
-
-/* Toggle cluster */
 .toggle-cluster{ display:flex; align-items:center; gap:10px; flex-wrap: wrap; }
 .label-chip{
   color: var(--beige-soft); font-weight:700; font-size: 12px; letter-spacing: .2px;
@@ -122,22 +105,19 @@ const styles = `
 }
 .on .knob{ background: rgba(46,204,113,0.55); }
 .on .dot{ left: 21px; }
-
 .time-chip{
   background: rgba(245,233,212,0.18); color: var(--beige);
   border: 1px solid rgba(245,233,212,0.32);
   border-radius: 999px; padding: 6px 10px; font-size: 12px;
   box-shadow: 0 6px 14px rgba(245,233,212,0.18);
 }
-
-/* Inputs */
 .field, .area{
   background: rgba(255,255,255,0.08);
   border: 1px solid rgba(255,255,255,0.12);
   border-radius: 14px; padding: 10px 12px; color: var(--beige);
   box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06);
 }
-input[type="text"]{
+input[type="text"], input[type="number"], input[type="date"], input[type="week"], input[type="month"]{
   width: 100%; background: transparent; color: var(--beige); border: none; outline: none;
   font-family: inherit; font-size: 14px;
 }
@@ -145,8 +125,6 @@ textarea{
   width: 100%; min-height: 86px; resize: vertical; background: transparent; color: var(--beige); border: none; outline: none;
   font-family: inherit; font-size: 14px;
 }
-
-/* Buttons */
 .actions{ display:flex; gap:10px; justify-content:flex-end; margin-top: 10px; }
 .inline-actions{ display:flex; gap:8px; }
 .btn{
@@ -162,12 +140,19 @@ textarea{
   box-shadow: 0 12px 28px rgba(245,233,212,0.28);
 }
 .btn.primary:hover{ filter: brightness(.98); transform: translateY(-1px); }
-
-/* Animations */
+.progress-track{
+  width: 100%; height: 10px; border-radius: 999px; background: rgba(255,255,255,0.14);
+  overflow: hidden; position: relative; box-shadow: inset 0 0 2px rgba(0,0,0,0.25);
+}
+.progress-fill{
+  height: 100%; background: linear-gradient(90deg, #7dd56f, #2ecc71);
+  transition: width .18s ease; border-radius: 999px;
+}
 .fade-in{ animation: fade .24s ease both; }
 @keyframes fade{ from{opacity:0; transform: translateY(6px);} to{opacity:1; transform:none;} }
 `;
 
+// Formatting helpers
 function formatLong(date) {
   return date.toLocaleDateString("en-IN", {
     weekday: "long", month: "long", day: "numeric", year: "numeric",
@@ -175,6 +160,57 @@ function formatLong(date) {
 }
 function formatTimeStamp(d) {
   return d.toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+// ISO week helpers: compute Monday–Sunday range for YYYY-Www
+function isoWeekRange(isoWeekStr) {
+  const [yearStr, weekStrRaw] = isoWeekStr.split("-W");
+  const year = parseInt(yearStr, 10);
+  const week = parseInt(weekStrRaw, 10);
+  const jan4 = new Date(Date.UTC(year, 0, 4));
+  const jan4Day = jan4.getUTCDay() || 7; // 1..7 (Mon..Sun)
+  const week1Monday = new Date(jan4);
+  week1Monday.setUTCDate(jan4.getUTCDate() - (jan4Day - 1));
+  const start = new Date(week1Monday);
+  start.setUTCDate(week1Monday.getUTCDate() + (week - 1) * 7);
+  const end = new Date(start);
+  end.setUTCDate(start.getUTCDate() + 6);
+  return { start, end };
+}
+function formatWeekLabel(isoWeekStr, locale = "en-IN") {
+  const { start, end } = isoWeekRange(isoWeekStr);
+  const fmt = new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" });
+  const fmtY = new Intl.DateTimeFormat(locale, { year: "numeric" });
+  const weekNum = isoWeekStr.split("-W")[1];
+  return `Week ${weekNum} • ${fmt.format(start)}–${fmt.format(end)}, ${fmtY.format(end)}`;
+}
+// Get current ISO week in YYYY-Www
+function currentIsoWeekString(d = new Date()) {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+  const year = date.getUTCFullYear();
+  const ww = String(weekNo).padStart(2, "0");
+  return `${year}-W${ww}`;
+}
+// Month helpers
+function monthLabel(ym, locale = "en-IN") {
+  const [y, m] = ym.split("-").map(Number);
+  const d = new Date(y, m - 1, 1);
+  return d.toLocaleDateString(locale, { month: "long", year: "numeric" });
+}
+function daysInMonth(ym) {
+  const [y, m] = ym.split("-").map(Number);
+  return new Date(y, m, 0).getDate();
+}
+// Date formatting to YYYY-MM-DD
+function toYMD(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 export default function GrowthPage() {
@@ -190,6 +226,24 @@ export default function GrowthPage() {
     { done: false, title: "", notes: "", doneAt: null },
   ]);
 
+  // Weekly: dynamic
+  const [weeklyWeek, setWeeklyWeek] = useState(() => currentIsoWeekString());
+  const weeklyLabel = useMemo(() => formatWeekLabel(weeklyWeek), [weeklyWeek]);
+  const [weeklyGoals, setWeeklyGoals] = useState([]);
+  const addWeeklyGoal = () => {
+    setWeeklyGoals((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), done: false, title: "", notes: "", doneAt: null },
+    ]);
+  };
+  const removeWeeklyGoal = (id) => setWeeklyGoals((p) => p.filter((g) => g.id !== id));
+  const toggleWeekly = (id) =>
+    setWeeklyGoals((p) =>
+      p.map((g) => (g.id === id ? { ...g, done: !g.done, doneAt: !g.done ? new Date().toISOString() : null } : g))
+    );
+  const setWeeklyTitle = (id, val) => setWeeklyGoals((p) => p.map((g) => (g.id === id ? { ...g, title: val } : g)));
+  const setWeeklyNotes = (id, val) => setWeeklyGoals((p) => p.map((g) => (g.id === id ? { ...g, notes: val } : g)));
+
   // Monthly: dynamic
   const [monthlyGoals, setMonthlyGoals] = useState([]);
   const addMonthlyGoal = () => {
@@ -201,12 +255,124 @@ export default function GrowthPage() {
   const removeMonthlyGoal = (id) => setMonthlyGoals((p) => p.filter((g) => g.id !== id));
   const toggleMonthly = (id) =>
     setMonthlyGoals((p) =>
-      p.map((g) =>
-        g.id === id ? { ...g, done: !g.done, doneAt: !g.done ? new Date().toISOString() : null } : g
-      )
+      p.map((g) => (g.id === id ? { ...g, done: !g.done, doneAt: !g.done ? new Date().toISOString() : null } : g))
     );
   const setMonthlyTitle = (id, val) => setMonthlyGoals((p) => p.map((g) => (g.id === id ? { ...g, title: val } : g)));
   const setMonthlyNotes = (id, val) => setMonthlyGoals((p) => p.map((g) => (g.id === id ? { ...g, notes: val } : g)));
+
+  // Analytics storage: values keyed by date YYYY-MM-DD
+  const todayYMD = toYMD(new Date());
+  const [analyticsByDay, setAnalyticsByDay] = useState({
+    // Example seed; real app would persist/load
+    // [todayYMD]: { mfdi: 60, motion: 50, presence: 70 }
+  });
+
+  // Analytics UI state
+  const [analyticsScope, setAnalyticsScope] = useState("Daily"); // Daily | Weekly | Monthly
+  const [analyticsDate, setAnalyticsDate] = useState(todayYMD); // yyyy-mm-dd
+  const [analyticsWeek, setAnalyticsWeek] = useState(() => currentIsoWeekString()); // yyyy-Www
+  const [analyticsMonth, setAnalyticsMonth] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; // yyyy-mm
+  });
+
+  // Editing fields (bound to current selection)
+  const [mfdi, setMfdi] = useState(0);
+  const [motion, setMotion] = useState(0);
+  const [presence, setPresence] = useState(0);
+
+  // Monthly hours accumulator
+  const [monthlyHours, setMonthlyHours] = useState(0);
+  const [addHours, setAddHours] = useState("");
+
+  const clampPct = (n) => Math.max(0, Math.min(100, Number.isFinite(+n) ? +n : 0));
+  const pctStyle = (n) => ({ width: `${clampPct(n)}%` });
+
+  // Helpers for ranges
+  function getDatesInWeek(isoWeekStr) {
+    const { start } = isoWeekRange(isoWeekStr);
+    const out = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(start);
+      d.setUTCDate(start.getUTCDate() + i);
+      out.push(toYMD(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))); // normalize to local YMD
+    }
+    return out;
+  }
+  function getDatesInMonth(ym) {
+    const [y, m] = ym.split("-").map(Number);
+    const days = daysInMonth(ym);
+    const out = [];
+    for (let d = 1; d <= days; d++) {
+      out.push(`${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`);
+    }
+    return out;
+  }
+
+  // Load current selection values into edit fields when selection changes
+  function loadFieldsForSelection() {
+    if (analyticsScope === "Daily") {
+      const v = analyticsByDay[analyticsDate] || { mfdi: 0, motion: 0, presence: 0 };
+      setMfdi(v.mfdi ?? 0);
+      setMotion(v.motion ?? 0);
+      setPresence(v.presence ?? 0);
+    } else if (analyticsScope === "Weekly") {
+      const dates = getDatesInWeek(analyticsWeek);
+      const vals = dates.map((d) => analyticsByDay[d]).filter(Boolean);
+      const avg = (key) => (vals.length ? Math.round(vals.reduce((s, v) => s + (v[key] ?? 0), 0) / vals.length) : 0);
+      setMfdi(avg("mfdi"));
+      setMotion(avg("motion"));
+      setPresence(avg("presence"));
+    } else {
+      const dates = getDatesInMonth(analyticsMonth);
+      const vals = dates.map((d) => analyticsByDay[d]).filter(Boolean);
+      const avg = (key) => (vals.length ? Math.round(vals.reduce((s, v) => s + (v[key] ?? 0), 0) / vals.length) : 0);
+      setMfdi(avg("mfdi"));
+      setMotion(avg("motion"));
+      setPresence(avg("presence"));
+    }
+  }
+
+  // On mount and when selection changes
+  useMemo(loadFieldsForSelection, [analyticsScope, analyticsDate, analyticsWeek, analyticsMonth, analyticsByDay]);
+
+  // Commit current edit fields into the data store
+  function saveAnalyticsForSelection() {
+    if (analyticsScope === "Daily") {
+      setAnalyticsByDay((prev) => ({
+        ...prev,
+        [analyticsDate]: { mfdi: clampPct(mfdi), motion: clampPct(motion), presence: clampPct(presence) },
+      }));
+    } else if (analyticsScope === "Weekly") {
+      // Distribute weekly average back to each day that exists, or create entries
+      const dates = getDatesInWeek(analyticsWeek);
+      setAnalyticsByDay((prev) => {
+        const next = { ...prev };
+        dates.forEach((d) => {
+          next[d] = { mfdi: clampPct(mfdi), motion: clampPct(motion), presence: clampPct(presence) };
+        });
+        return next;
+      });
+    } else {
+      const dates = getDatesInMonth(analyticsMonth);
+      setAnalyticsByDay((prev) => {
+        const next = { ...prev };
+        dates.forEach((d) => {
+          next[d] = { mfdi: clampPct(mfdi), motion: clampPct(motion), presence: clampPct(presence) };
+        });
+        return next;
+      });
+    }
+    alert("Analytics saved");
+  }
+
+  const commitAddHours = () => {
+    const v = parseFloat(addHours);
+    if (!isNaN(v) && v > 0) {
+      setMonthlyHours((h) => +(h + v).toFixed(2));
+      setAddHours("");
+    }
+  };
 
   // Daily helpers
   const toggleDaily = (idx) =>
@@ -228,7 +394,26 @@ export default function GrowthPage() {
 
   const handleBack = () => { if (window.history.length > 1) window.history.back(); };
   const handleSave = () => {
-    const payload = { date: dateLabel, scope, daily: dailyTasks, monthly: monthlyGoals };
+    const payload = {
+      date: dateLabel,
+      scope,
+      weeklyKey: weeklyWeek,
+      weeklyRange: isoWeekRange(weeklyWeek),
+      daily: dailyTasks,
+      weekly: weeklyGoals,
+      monthly: monthlyGoals,
+      analytics: {
+        scope: analyticsScope,
+        date: analyticsDate,
+        week: analyticsWeek,
+        month: analyticsMonth,
+        mfdi: clampPct(mfdi),
+        motion: clampPct(motion),
+        presence: clampPct(presence),
+        monthlyHours,
+        byDay: analyticsByDay
+      }
+    };
     console.log("Growth entry:", payload);
     alert("Saved");
   };
@@ -237,7 +422,6 @@ export default function GrowthPage() {
     <div className="growth-wrap fade-in">
       <style>{styles}</style>
 
-      {/* Optional background video (place public/bg.mp4) */}
       <video className="bg-video" autoPlay muted loop playsInline>
         <source src="/bg.mp4" type="video/mp4" />
       </video>
@@ -252,7 +436,7 @@ export default function GrowthPage() {
 
         <div className="scope-wrap">
           <div className="scope-row">
-            {["Daily", "Monthly", "Long Term"].map((s) => (
+            {["Daily", "Weekly", "Monthly", "Analytics", "Long Term"].map((s) => (
               <button
                 key={s}
                 className={`scope-btn ${scope === s ? "active" : ""}`}
@@ -291,6 +475,66 @@ export default function GrowthPage() {
           </div>
         )}
 
+        {scope === "Weekly" && (
+          <div className="mount-enter">
+            <div className="section-title">Weekly goals</div>
+
+            <div className="actions" style={{ justifyContent: "flex-start", marginBottom: 8, gap: 12 }}>
+              <label className="btn small" style={{ cursor: "default" }}>
+                <span style={{ marginRight: 8 }}>Select week</span>
+                <input
+                  type="week"
+                  value={weeklyWeek}
+                  onChange={(e) => setWeeklyWeek(e.target.value)}
+                  style={{ background: "transparent", border: "none", color: "inherit" }}
+                />
+              </label>
+
+              <div className="btn small" style={{ cursor: "default" }}>
+                {weeklyLabel}
+              </div>
+
+              <button className="btn primary small" onClick={addWeeklyGoal}>+ Add weekly goal</button>
+            </div>
+
+            <div className="list">
+              {weeklyGoals.length === 0 && (
+                <div className="field">No weekly goals yet. Use “+ Add weekly goal”.</div>
+              )}
+              {weeklyGoals.map((g) => (
+                <div key={g.id} className="row">
+                  <div className="toggle-cluster">
+                    <span className="label-chip">Goal</span>
+                    <label className={`task-toggle ${g.done ? "on" : ""}`} onClick={() => toggleWeekly(g.id)}>
+                      <span className="knob"><span className="dot" /></span>
+                      <input type="checkbox" checked={g.done} readOnly />
+                    </label>
+                    {g.doneAt && <span className="time-chip">{formatTimeStamp(new Date(g.doneAt))}</span>}
+                  </div>
+                  <div className="field">
+                    <input
+                      type="text"
+                      placeholder="Goal title"
+                      value={g.title}
+                      onChange={(e) => setWeeklyTitle(g.id, e.target.value)}
+                    />
+                  </div>
+                  <div className="area">
+                    <textarea
+                      placeholder="Notes / details"
+                      value={g.notes}
+                      onChange={(e) => setWeeklyNotes(g.id, e.target.value)}
+                    />
+                  </div>
+                  <div className="cell-actions inline-actions">
+                    <button className="btn small" onClick={() => removeWeeklyGoal(g.id)}>Remove</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {scope === "Monthly" && (
           <div className="mount-enter">
             <div className="section-title">Monthly goals</div>
@@ -322,6 +566,173 @@ export default function GrowthPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {scope === "Analytics" && (
+          <div className="mount-enter">
+            <div className="section-title">Analytics</div>
+
+            {/* Granularity + pickers + selected label */}
+            <div className="actions" style={{ justifyContent: "flex-start", marginBottom: 8, gap: 12 }}>
+              {["Daily", "Weekly", "Monthly"].map((g) => (
+                <button
+                  key={g}
+                  className={`btn small ${analyticsScope === g ? "primary" : ""}`}
+                  onClick={() => setAnalyticsScope(g)}
+                >
+                  {g}
+                </button>
+              ))}
+
+              {analyticsScope === "Daily" && (
+                <label className="btn small" style={{ cursor: "default" }}>
+                  <span style={{ marginRight: 8 }}>Date</span>
+                  <input
+                    type="date"
+                    value={analyticsDate}
+                    onChange={(e) => setAnalyticsDate(e.target.value)}
+                  />
+                </label>
+              )}
+
+              {analyticsScope === "Weekly" && (
+                <label className="btn small" style={{ cursor: "default" }}>
+                  <span style={{ marginRight: 8 }}>Week</span>
+                  <input
+                    type="week"
+                    value={analyticsWeek}
+                    onChange={(e) => setAnalyticsWeek(e.target.value)}
+                  />
+                </label>
+              )}
+
+              {analyticsScope === "Monthly" && (
+                <label className="btn small" style={{ cursor: "default" }}>
+                  <span style={{ marginRight: 8 }}>Month</span>
+                  <input
+                    type="month"
+                    value={analyticsMonth}
+                    onChange={(e) => setAnalyticsMonth(e.target.value)}
+                  />
+                </label>
+              )}
+
+              <div className="btn small" style={{ cursor: "default" }}>
+                {analyticsScope === "Daily" && `Selected: ${new Date(analyticsDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}`}
+                {analyticsScope === "Weekly" && `Selected: ${formatWeekLabel(analyticsWeek)}`}
+                {analyticsScope === "Monthly" && `Selected: ${monthLabel(analyticsMonth)}`}
+              </div>
+            </div>
+
+            {/* Metrics rows show current average (for Weekly/Monthly) or the day's value */}
+            <div className="list">
+              {/* MFDI */}
+              <div className="row">
+                <div className="toggle-cluster" style={{ alignItems: "center" }}>
+                  <span className="label-chip">MFDI (%)</span>
+                </div>
+                <div className="field">
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={mfdi}
+                    onChange={(e) => setMfdi(clampPct(e.target.value))}
+                    placeholder="0 – 100"
+                  />
+                </div>
+                <div className="area" style={{ display: "flex", alignItems: "center" }}>
+                  <div className="progress-track" aria-label="MFDI progress">
+                    <div className="progress-fill" style={pctStyle(mfdi)} />
+                  </div>
+                </div>
+                <div className="cell-actions inline-actions">
+                  <span className="time-chip">{clampPct(mfdi)}%</span>
+                </div>
+              </div>
+
+              {/* Motion */}
+              <div className="row">
+                <div className="toggle-cluster" style={{ alignItems: "center" }}>
+                  <span className="label-chip">Motion (%)</span>
+                </div>
+                <div className="field">
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={motion}
+                    onChange={(e) => setMotion(clampPct(e.target.value))}
+                    placeholder="0 – 100"
+                  />
+                </div>
+                <div className="area" style={{ display: "flex", alignItems: "center" }}>
+                  <div className="progress-track" aria-label="Motion progress">
+                    <div className="progress-fill" style={pctStyle(motion)} />
+                  </div>
+                </div>
+                <div className="cell-actions inline-actions">
+                  <span className="time-chip">{clampPct(motion)}%</span>
+                </div>
+              </div>
+
+              {/* Presence */}
+              <div className="row">
+                <div className="toggle-cluster" style={{ alignItems: "center" }}>
+                  <span className="label-chip">Presence (%)</span>
+                </div>
+                <div className="field">
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={presence}
+                    onChange={(e) => setPresence(clampPct(e.target.value))}
+                    placeholder="0 – 100"
+                  />
+                </div>
+                <div className="area" style={{ display: "flex", alignItems: "center" }}>
+                  <div className="progress-track" aria-label="Presence progress">
+                    <div className="progress-fill" style={pctStyle(presence)} />
+                  </div>
+                </div>
+                <div className="cell-actions inline-actions">
+                  <span className="time-chip">{clampPct(presence)}%</span>
+                </div>
+              </div>
+
+              {/* Monthly hours accumulator */}
+              <div className="row">
+                <div className="toggle-cluster" style={{ alignItems: "center" }}>
+                  <span className="label-chip">Monthly hours</span>
+                </div>
+                <div className="field">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.25"
+                    value={addHours}
+                    onChange={(e) => setAddHours(e.target.value)}
+                    placeholder="Add hours (e.g., 1.5)"
+                  />
+                </div>
+                <div className="area" style={{ display: "flex", alignItems: "center" }}>
+                  <button className="btn small" onClick={commitAddHours}>Add to total</button>
+                </div>
+                <div className="cell-actions inline-actions">
+                  <span className="time-chip">{monthlyHours.toFixed(2)} h</span>
+                </div>
+              </div>
+
+              {/* Save analytics changes for current selection */}
+              <div className="actions" style={{ justifyContent: "flex-start" }}>
+                <button className="btn primary small" onClick={saveAnalyticsForSelection}>Save analytics for selected period</button>
+              </div>
             </div>
           </div>
         )}
