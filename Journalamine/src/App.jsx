@@ -1,6 +1,8 @@
 import { useState } from "react";
 import CalendarPage from "./CalendarPage";
 import WellnessScreen from "./Screens/WellneesScreen.jsx"; // fixed path
+import AnalyticsStandalone from "./Pages/AnalyticsStandalone.jsx"
+import { Routes, Route, Link } from "react-router-dom";
 
 const theme = `
 :root{
@@ -151,13 +153,37 @@ export default function App() {
       </div>
 
       <div className="container">
-        <div className="switcher">
-          <button className={`btn ${view === "calendar" ? "primary" : ""}`} onClick={() => setView("calendar")}>Calendar</button>
-          <button className={`btn ${view === "wellness" ? "primary" : ""}`} onClick={() => setView("wellness")}>Wellness</button>
-        </div>
+        <Routes>
+          {/* Home keeps the toggle */}
+          <Route
+            path="/"
+            element={
+              <>
+                <div className="switcher">
+                  <button
+                    className={`btn ${view === "calendar" ? "primary" : ""}`}
+                    onClick={() => setView("calendar")}
+                  >
+                    Calendar
+                  </button>
+                  <button
+                    className={`btn ${view === "wellness" ? "primary" : ""}`}
+                    onClick={() => setView("wellness")}
+                  >
+                    Wellness
+                  </button>
+                </div>
 
-        {view === "calendar" ? <CalendarPage /> : <WellnessScreen />}
+                {view === "calendar" ? <CalendarPage /> : <WellnessScreen />}
+              </>
+            }
+          />
+
+          {/* New mapping for http://localhost:5173/analytics */}
+          <Route path="/analytics" element={<AnalyticsStandalone />} />
+        </Routes>
       </div>
     </div>
   );
+
 }

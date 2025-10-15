@@ -1,5 +1,6 @@
 // src/pages/GrowthPage.jsx
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 
 const styles = `
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&display=swap');
@@ -162,13 +163,13 @@ function formatTimeStamp(d) {
   return d.toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
-// ISO week helpers: compute Monday–Sunday range for YYYY-Www
+// ISO week helpers
 function isoWeekRange(isoWeekStr) {
   const [yearStr, weekStrRaw] = isoWeekStr.split("-W");
   const year = parseInt(yearStr, 10);
   const week = parseInt(weekStrRaw, 10);
   const jan4 = new Date(Date.UTC(year, 0, 4));
-  const jan4Day = jan4.getUTCDay() || 7; // 1..7 (Mon..Sun)
+  const jan4Day = jan4.getUTCDay() || 7;
   const week1Monday = new Date(jan4);
   week1Monday.setUTCDate(jan4.getUTCDate() - (jan4Day - 1));
   const start = new Date(week1Monday);
@@ -184,7 +185,6 @@ function formatWeekLabel(isoWeekStr, locale = "en-IN") {
   const weekNum = isoWeekStr.split("-W")[1];
   return `Week ${weekNum} • ${fmt.format(start)}–${fmt.format(end)}, ${fmtY.format(end)}`;
 }
-// Get current ISO week in YYYY-Www
 function currentIsoWeekString(d = new Date()) {
   const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
   const dayNum = date.getUTCDay() || 7;
@@ -195,7 +195,6 @@ function currentIsoWeekString(d = new Date()) {
   const ww = String(weekNo).padStart(2, "0");
   return `${year}-W${ww}`;
 }
-// Month helpers
 function monthLabel(ym, locale = "en-IN") {
   const [y, m] = ym.split("-").map(Number);
   const d = new Date(y, m - 1, 1);
@@ -205,7 +204,6 @@ function daysInMonth(ym) {
   const [y, m] = ym.split("-").map(Number);
   return new Date(y, m, 0).getDate();
 }
-// Date formatting to YYYY-MM-DD
 function toYMD(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -260,120 +258,6 @@ export default function GrowthPage() {
   const setMonthlyTitle = (id, val) => setMonthlyGoals((p) => p.map((g) => (g.id === id ? { ...g, title: val } : g)));
   const setMonthlyNotes = (id, val) => setMonthlyGoals((p) => p.map((g) => (g.id === id ? { ...g, notes: val } : g)));
 
-  // Analytics storage: values keyed by date YYYY-MM-DD
-  const todayYMD = toYMD(new Date());
-  const [analyticsByDay, setAnalyticsByDay] = useState({
-    // Example seed; real app would persist/load
-    // [todayYMD]: { mfdi: 60, motion: 50, presence: 70 }
-  });
-
-  // Analytics UI state
-  const [analyticsScope, setAnalyticsScope] = useState("Daily"); // Daily | Weekly | Monthly
-  const [analyticsDate, setAnalyticsDate] = useState(todayYMD); // yyyy-mm-dd
-  const [analyticsWeek, setAnalyticsWeek] = useState(() => currentIsoWeekString()); // yyyy-Www
-  const [analyticsMonth, setAnalyticsMonth] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; // yyyy-mm
-  });
-
-  // Editing fields (bound to current selection)
-  const [mfdi, setMfdi] = useState(0);
-  const [motion, setMotion] = useState(0);
-  const [presence, setPresence] = useState(0);
-
-  // Monthly hours accumulator
-  const [monthlyHours, setMonthlyHours] = useState(0);
-  const [addHours, setAddHours] = useState("");
-
-  const clampPct = (n) => Math.max(0, Math.min(100, Number.isFinite(+n) ? +n : 0));
-  const pctStyle = (n) => ({ width: `${clampPct(n)}%` });
-
-  // Helpers for ranges
-  function getDatesInWeek(isoWeekStr) {
-    const { start } = isoWeekRange(isoWeekStr);
-    const out = [];
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(start);
-      d.setUTCDate(start.getUTCDate() + i);
-      out.push(toYMD(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))); // normalize to local YMD
-    }
-    return out;
-  }
-  function getDatesInMonth(ym) {
-    const [y, m] = ym.split("-").map(Number);
-    const days = daysInMonth(ym);
-    const out = [];
-    for (let d = 1; d <= days; d++) {
-      out.push(`${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`);
-    }
-    return out;
-  }
-
-  // Load current selection values into edit fields when selection changes
-  function loadFieldsForSelection() {
-    if (analyticsScope === "Daily") {
-      const v = analyticsByDay[analyticsDate] || { mfdi: 0, motion: 0, presence: 0 };
-      setMfdi(v.mfdi ?? 0);
-      setMotion(v.motion ?? 0);
-      setPresence(v.presence ?? 0);
-    } else if (analyticsScope === "Weekly") {
-      const dates = getDatesInWeek(analyticsWeek);
-      const vals = dates.map((d) => analyticsByDay[d]).filter(Boolean);
-      const avg = (key) => (vals.length ? Math.round(vals.reduce((s, v) => s + (v[key] ?? 0), 0) / vals.length) : 0);
-      setMfdi(avg("mfdi"));
-      setMotion(avg("motion"));
-      setPresence(avg("presence"));
-    } else {
-      const dates = getDatesInMonth(analyticsMonth);
-      const vals = dates.map((d) => analyticsByDay[d]).filter(Boolean);
-      const avg = (key) => (vals.length ? Math.round(vals.reduce((s, v) => s + (v[key] ?? 0), 0) / vals.length) : 0);
-      setMfdi(avg("mfdi"));
-      setMotion(avg("motion"));
-      setPresence(avg("presence"));
-    }
-  }
-
-  // On mount and when selection changes
-  useMemo(loadFieldsForSelection, [analyticsScope, analyticsDate, analyticsWeek, analyticsMonth, analyticsByDay]);
-
-  // Commit current edit fields into the data store
-  function saveAnalyticsForSelection() {
-    if (analyticsScope === "Daily") {
-      setAnalyticsByDay((prev) => ({
-        ...prev,
-        [analyticsDate]: { mfdi: clampPct(mfdi), motion: clampPct(motion), presence: clampPct(presence) },
-      }));
-    } else if (analyticsScope === "Weekly") {
-      // Distribute weekly average back to each day that exists, or create entries
-      const dates = getDatesInWeek(analyticsWeek);
-      setAnalyticsByDay((prev) => {
-        const next = { ...prev };
-        dates.forEach((d) => {
-          next[d] = { mfdi: clampPct(mfdi), motion: clampPct(motion), presence: clampPct(presence) };
-        });
-        return next;
-      });
-    } else {
-      const dates = getDatesInMonth(analyticsMonth);
-      setAnalyticsByDay((prev) => {
-        const next = { ...prev };
-        dates.forEach((d) => {
-          next[d] = { mfdi: clampPct(mfdi), motion: clampPct(motion), presence: clampPct(presence) };
-        });
-        return next;
-      });
-    }
-    alert("Analytics saved");
-  }
-
-  const commitAddHours = () => {
-    const v = parseFloat(addHours);
-    if (!isNaN(v) && v > 0) {
-      setMonthlyHours((h) => +(h + v).toFixed(2));
-      setAddHours("");
-    }
-  };
-
   // Daily helpers
   const toggleDaily = (idx) =>
     setDailyTasks((prev) => {
@@ -401,18 +285,7 @@ export default function GrowthPage() {
       weeklyRange: isoWeekRange(weeklyWeek),
       daily: dailyTasks,
       weekly: weeklyGoals,
-      monthly: monthlyGoals,
-      analytics: {
-        scope: analyticsScope,
-        date: analyticsDate,
-        week: analyticsWeek,
-        month: analyticsMonth,
-        mfdi: clampPct(mfdi),
-        motion: clampPct(motion),
-        presence: clampPct(presence),
-        monthlyHours,
-        byDay: analyticsByDay
-      }
+      monthly: monthlyGoals
     };
     console.log("Growth entry:", payload);
     alert("Saved");
@@ -436,7 +309,7 @@ export default function GrowthPage() {
 
         <div className="scope-wrap">
           <div className="scope-row">
-            {["Daily", "Weekly", "Monthly", "Analytics", "Long Term"].map((s) => (
+            {["Daily", "Weekly", "Monthly", "Long Term"].map((s) => (
               <button
                 key={s}
                 className={`scope-btn ${scope === s ? "active" : ""}`}
@@ -445,6 +318,11 @@ export default function GrowthPage() {
                 {s}
               </button>
             ))}
+
+            {/* Direct navigation to dedicated Analytics page */}
+            <Link to="/analytics" className="scope-btn" style={{ textDecoration: "none", display: "inline-flex", alignItems: "center" }}>
+              Open Analytics Page
+            </Link>
           </div>
         </div>
 
@@ -570,173 +448,6 @@ export default function GrowthPage() {
           </div>
         )}
 
-        {scope === "Analytics" && (
-          <div className="mount-enter">
-            <div className="section-title">Analytics</div>
-
-            {/* Granularity + pickers + selected label */}
-            <div className="actions" style={{ justifyContent: "flex-start", marginBottom: 8, gap: 12 }}>
-              {["Daily", "Weekly", "Monthly"].map((g) => (
-                <button
-                  key={g}
-                  className={`btn small ${analyticsScope === g ? "primary" : ""}`}
-                  onClick={() => setAnalyticsScope(g)}
-                >
-                  {g}
-                </button>
-              ))}
-
-              {analyticsScope === "Daily" && (
-                <label className="btn small" style={{ cursor: "default" }}>
-                  <span style={{ marginRight: 8 }}>Date</span>
-                  <input
-                    type="date"
-                    value={analyticsDate}
-                    onChange={(e) => setAnalyticsDate(e.target.value)}
-                  />
-                </label>
-              )}
-
-              {analyticsScope === "Weekly" && (
-                <label className="btn small" style={{ cursor: "default" }}>
-                  <span style={{ marginRight: 8 }}>Week</span>
-                  <input
-                    type="week"
-                    value={analyticsWeek}
-                    onChange={(e) => setAnalyticsWeek(e.target.value)}
-                  />
-                </label>
-              )}
-
-              {analyticsScope === "Monthly" && (
-                <label className="btn small" style={{ cursor: "default" }}>
-                  <span style={{ marginRight: 8 }}>Month</span>
-                  <input
-                    type="month"
-                    value={analyticsMonth}
-                    onChange={(e) => setAnalyticsMonth(e.target.value)}
-                  />
-                </label>
-              )}
-
-              <div className="btn small" style={{ cursor: "default" }}>
-                {analyticsScope === "Daily" && `Selected: ${new Date(analyticsDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}`}
-                {analyticsScope === "Weekly" && `Selected: ${formatWeekLabel(analyticsWeek)}`}
-                {analyticsScope === "Monthly" && `Selected: ${monthLabel(analyticsMonth)}`}
-              </div>
-            </div>
-
-            {/* Metrics rows show current average (for Weekly/Monthly) or the day's value */}
-            <div className="list">
-              {/* MFDI */}
-              <div className="row">
-                <div className="toggle-cluster" style={{ alignItems: "center" }}>
-                  <span className="label-chip">MFDI (%)</span>
-                </div>
-                <div className="field">
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="1"
-                    value={mfdi}
-                    onChange={(e) => setMfdi(clampPct(e.target.value))}
-                    placeholder="0 – 100"
-                  />
-                </div>
-                <div className="area" style={{ display: "flex", alignItems: "center" }}>
-                  <div className="progress-track" aria-label="MFDI progress">
-                    <div className="progress-fill" style={pctStyle(mfdi)} />
-                  </div>
-                </div>
-                <div className="cell-actions inline-actions">
-                  <span className="time-chip">{clampPct(mfdi)}%</span>
-                </div>
-              </div>
-
-              {/* Motion */}
-              <div className="row">
-                <div className="toggle-cluster" style={{ alignItems: "center" }}>
-                  <span className="label-chip">Motion (%)</span>
-                </div>
-                <div className="field">
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="1"
-                    value={motion}
-                    onChange={(e) => setMotion(clampPct(e.target.value))}
-                    placeholder="0 – 100"
-                  />
-                </div>
-                <div className="area" style={{ display: "flex", alignItems: "center" }}>
-                  <div className="progress-track" aria-label="Motion progress">
-                    <div className="progress-fill" style={pctStyle(motion)} />
-                  </div>
-                </div>
-                <div className="cell-actions inline-actions">
-                  <span className="time-chip">{clampPct(motion)}%</span>
-                </div>
-              </div>
-
-              {/* Presence */}
-              <div className="row">
-                <div className="toggle-cluster" style={{ alignItems: "center" }}>
-                  <span className="label-chip">Presence (%)</span>
-                </div>
-                <div className="field">
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="1"
-                    value={presence}
-                    onChange={(e) => setPresence(clampPct(e.target.value))}
-                    placeholder="0 – 100"
-                  />
-                </div>
-                <div className="area" style={{ display: "flex", alignItems: "center" }}>
-                  <div className="progress-track" aria-label="Presence progress">
-                    <div className="progress-fill" style={pctStyle(presence)} />
-                  </div>
-                </div>
-                <div className="cell-actions inline-actions">
-                  <span className="time-chip">{clampPct(presence)}%</span>
-                </div>
-              </div>
-
-              {/* Monthly hours accumulator */}
-              <div className="row">
-                <div className="toggle-cluster" style={{ alignItems: "center" }}>
-                  <span className="label-chip">Monthly hours</span>
-                </div>
-                <div className="field">
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.25"
-                    value={addHours}
-                    onChange={(e) => setAddHours(e.target.value)}
-                    placeholder="Add hours (e.g., 1.5)"
-                  />
-                </div>
-                <div className="area" style={{ display: "flex", alignItems: "center" }}>
-                  <button className="btn small" onClick={commitAddHours}>Add to total</button>
-                </div>
-                <div className="cell-actions inline-actions">
-                  <span className="time-chip">{monthlyHours.toFixed(2)} h</span>
-                </div>
-              </div>
-
-              {/* Save analytics changes for current selection */}
-              <div className="actions" style={{ justifyContent: "flex-start" }}>
-                <button className="btn primary small" onClick={saveAnalyticsForSelection}>Save analytics for selected period</button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {scope === "Long Term" && (
           <div className="mount-enter">
             <div className="section-title">Long-term goals</div>
@@ -752,3 +463,10 @@ export default function GrowthPage() {
     </div>
   );
 }
+
+export {
+  isoWeekRange,
+  formatWeekLabel,
+  monthLabel,
+  toYMD
+};
